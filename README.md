@@ -24,6 +24,11 @@ Local-only observability stack for an OPNsense-centred home network. Visualise W
 - docs/grafana-plugins.md (optional)
 - docs/maxmind-geoip.md (optional)
 
+## Environment-Specific Configuration
+- docs/network-configuration.md
+- docs/media-stack-topology.md
+- docs/deployment-parameters.md
+
 ## Config templates
 - configs/promtail/promtail-syslog-pipeline.example.yml
 - configs/prometheus/prometheus-scrape-config.example.yml
