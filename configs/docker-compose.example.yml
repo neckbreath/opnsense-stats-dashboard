@@ -1,0 +1,109 @@
+version: '3.8'
+
+networks:
+  monitoring:
+    name: monitoring
+
+volumes:
+  prometheus-data: {}
+  loki-data: {}
+  grafana-data: {}
+  promtail-positions: {}
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=31d
+    volumes:
+      - prometheus-data:/prometheus
+      - ./configs/prometheus/prometheus-scrape-config.example.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 9090:9090
+    networks: [monitoring]
+
+  loki:
+    image: grafana/loki:2.9.6
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - loki-data:/loki
+      - ./configs/loki/loki-single-process.example.yml:/etc/loki/config.yml:ro
+    ports:
+      - 3100:3100
+    networks: [monitoring]
+
+  promtail:
+    image: grafana/promtail:2.9.6
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - promtail-positions:/run/promtail
+      - ./configs/promtail/promtail-syslog-pipeline.example.yml:/etc/promtail/config.yml:ro
+      - ./configs/promtail/GeoLite2-City.mmdb:/etc/promtail/GeoLite2-City.mmdb:ro
+      - /var/log/event-collector:/var/log/event-collector:ro
+    ports:
+      - 514:514/tcp
+      - 515:515/tcp
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana/provisioning/datasources.example.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    environment:
+      - GF_SERVER_DOMAIN=grafana.unconfigured.page
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_DEFAULT_THEME=light
+      - TZ=Australia/Sydney
+    ports:
+      - 3000:3000
+    networks: [monitoring]
+
+  snmp_exporter:
+    image: prom/snmp-exporter:latest
+    ports:
+      - 9116:9116
+    networks: [monitoring]
+
+  unbound_exporter:
+    image: mfin/unbound_exporter:latest
+    environment:
+      - UNBOUND_HOST=192.168.10.1
+      - UNBOUND_PORT=8953
+      - UNBOUND_CONTROL_KEY=/certs/unbound_control.key
+      - UNBOUND_CONTROL_CERT=/certs/unbound_control.pem
+      - UNBOUND_SERVER_KEY=/certs/unbound_server.key
+      - UNBOUND_SERVER_CERT=/certs/unbound_server.pem
+    volumes:
+      - ./unbound-certs:/certs:ro
+    ports:
+      - 9167:9167
+    networks: [monitoring]
+
+  qbittorrent_exporter:
+    image: esanchezm/prometheus-qbittorrent-exporter:latest
+    environment:
+      - QBT_ADDRESS=http://qbittorrent:8080
+      - QBT_USERNAME=monitor
+      - QBT_PASSWORD=change-me
+    ports:
+      - 9022:9022
+    networks: [monitoring]
+
+  # TODO: add sonarr/radarr/prowlarr exporters per instance
+
+  event-collector:
+    image: ghcr.io/your-org/event-collector:latest
+    environment:
+      - EVENT_COLLECTOR_BIND=0.0.0.0:8088
+      - EVENT_COLLECTOR_TOKEN=change-me
+      - EVENT_COLLECTOR_LOG_DIR=/var/log/event-collector
+    volumes:
+      - /var/log/event-collector:/var/log/event-collector
+    ports:
+      - 8088:8088
+    networks: [monitoring]

@@ -1,0 +1,37 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: 'adguard'
+    metrics_path: /control/metrics
+    static_configs:
+      - targets: ['192.168.10.1:3000']  # adjust to actual AdGuard metrics port
+
+  - job_name: 'unbound_exporter'
+    static_configs:
+      - targets: ['unbound_exporter:9167']
+
+  - job_name: 'snmp_opnsense'
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+      target: ['192.168.10.1']
+    static_configs:
+      - targets: ['snmp_exporter:9116']
+
+  - job_name: 'qbittorrent_exporter'
+    static_configs:
+      - targets: ['qbittorrent_exporter:9022']
+
+  - job_name: 'sonarr_exporter'
+    static_configs:
+      - targets: ['sonarr_exporter_main:9707','sonarr_exporter_kids:9708','sonarr_exporter_anime:9709']
+
+  - job_name: 'radarr_exporter'
+    static_configs:
+      - targets: ['radarr_exporter_main:9607','radarr_exporter_uhd:9608','radarr_exporter_remux:9609']
+
+  - job_name: 'prowlarr_exporter'
+    static_configs:
+      - targets: ['prowlarr_exporter:9807']

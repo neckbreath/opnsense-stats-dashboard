@@ -1,0 +1,66 @@
+openapi: 3.0.3
+info:
+  title: Event Collector
+  version: 0.1.0
+servers:
+  - url: http://event-collector:8088
+paths:
+  /webhook/{service}/{instance}:
+    post:
+      summary: Receive a webhook event
+      parameters:
+        - in: path
+          name: service
+          required: true
+          schema:
+            type: string
+            enum: [sonarr, radarr, prowlarr, qbittorrent, cleanuparr, huntarr]
+        - in: path
+          name: instance
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: accepted
+      security:
+        - TokenAuth: []
+components:
+  securitySchemes:
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+  schemas:
+    Event:
+      type: object
+      properties:
+        action:
+          type: string
+          example: Imported
+        title:
+          type: string
+        quality:
+          type: string
+        size_bytes:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+      required: [action, timestamp]

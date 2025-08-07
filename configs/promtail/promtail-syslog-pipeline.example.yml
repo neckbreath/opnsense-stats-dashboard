@@ -1,0 +1,76 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /run/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: opnsense-syslog
+    syslog:
+      listen_address: 0.0.0.0:514
+      labels:
+        app: pf
+        host: opnsense
+      idle_timeout: 60s
+    relabel_configs:
+      - source_labels: ['__syslog_message_hostname']
+        target_label: host
+    pipeline_stages:
+      - regex:
+          expression: '.*(?:rule (?:\d+ )?\((?P<rule_label>[^\)]+)\) )?.* (?P<action>pass|block) (?P<iface>\w+) (?P<proto>\w+) (?P<src_ip>[0-9a-fA-F:\.]+)(?:\.(?P<src_port>\d+))? > (?P<dst_ip>[0-9a-fA-F:\.]+)(?:\.(?P<dst_port>\d+))?.*'
+      - labels:
+          rule_label:
+          action:
+          iface:
+          proto:
+          src_ip:
+          dst_ip:
+          src_port:
+          dst_port:
+      - geoip:
+          db: /etc/promtail/GeoLite2-City.mmdb
+          source: src_ip
+          db_type: city
+          labels:
+            country_iso: country.iso_code
+            city: city.names.en
+            latitude: location.latitude
+            longitude: location.longitude
+
+  - job_name: adguard-syslog
+    syslog:
+      listen_address: 0.0.0.0:515
+      labels:
+        app: adguard
+        host: opnsense
+      idle_timeout: 60s
+    pipeline_stages:
+      - regex:
+          expression: 'client=(?P<client_ip>[0-9a-fA-F:\.]+).*?domain=(?P<domain>\S+).*?type=(?P<type>\w+).*?status=(?P<status>\w+).*?(?:elapsed=(?P<elapsed_ms>\d+))?'
+      - labels:
+          client_ip:
+          domain:
+          type:
+          status:
+          elapsed_ms:
+
+  - job_name: event-collector-json
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: event-collector
+          __path__: /var/log/event-collector/*.jsonl
+    pipeline_stages:
+      - json:
+          expressions:
+            service: service
+            instance: instance
+            action: action
+      - labels:
+          service:
+          instance:
+          action:
