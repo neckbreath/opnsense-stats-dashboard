@@ -160,12 +160,24 @@ AdGuard Home API → Collector Service → rsyslog → Promtail → Loki
 
 **🚀 Deployment Ready**: Run `docker-compose up -d adguard_collector` after password configuration
 
+### ✅ Verification (Today)
+- Synthetic AdGuard-style syslog sent to rsyslog and confirmed in `opnsense-logs/firewall.log`
+- Same synthetic entry visible in Loki via `{job="opnsense-mixed"}` query
+- `adguard_exporter` metrics endpoint returning 200 OK on `:9617/metrics`
+- `loki` ready endpoint returns `ready`
+- `grafana` reachable (302 to `/login`)
+- `adguard_collector` polling AdGuard API and forwarding to rsyslog every 30s
+
 ## 🔄 PENDING PHASES
 
-### Phase 4: Media Services Integration - PENDING  
-- Configure media service exporters (Sonarr, Radarr, Prowlarr, qBittorrent)
-- Set up Event Collector for webhook notifications
-- Implement JSONL log processing for media events
+### Phase 4: Media Services Integration - IN PROGRESS  
+- Exporters defined and running for qBittorrent, Sonarr x3, Radarr x3, Prowlarr
+- Event Collector service built and started; JSONL pipeline in Promtail configured
+- NEXT: Configure webhooks in services to Event Collector and validate ingestion
+  - Sonarr: `/webhook/sonarr/{main|cartoons|anime}` (ports 8989, 8991, 8990)
+  - Radarr: `/webhook/radarr/{main|cartoons|anime}`
+  - Prowlarr: `/webhook/prowlarr/main`
+  - Header: `X-Auth-Token: $EVENT_COLLECTOR_TOKEN`
 
 ### Phase 5: Validation & Testing - PENDING
 - Verify all Grafana dashboards display data correctly
@@ -182,6 +194,8 @@ AdGuard Home API → Collector Service → rsyslog → Promtail → Loki
 5. **Volume Mounts**: Promtail has read-only access to opnsense-logs directory via bind mount
 6. **Network Configuration**: All services bound to `192.168.10.10` (not localhost)
 
-## 🚀 READY FOR PHASE 4
-
-The monitoring foundation is complete and stable. AdGuard integration is implemented via the API collector. Proceed with media services integration and validation.
+## ▶️ NEXT ACTIONS (Phase 4)
+1. Populate `.env` with all media API keys and `EVENT_COLLECTOR_TOKEN`
+2. Configure Sonarr/Radarr/Prowlarr webhooks to Event Collector URLs
+3. Generate test events; confirm JSONL created under `/var/log/event-collector/`
+4. Verify `{job="event-collector"}` logs appear in Loki and Grafana dashboard panels

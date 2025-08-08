@@ -1,10 +1,10 @@
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-
+# Copy module file and sources, then resolve deps (generates go.sum)
+COPY go.mod ./
 COPY *.go ./
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build -o event-collector .
 
 FROM alpine:latest
