@@ -1,0 +1,166 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /run/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # OPNsense pf firewall logs via syslog
+  - job_name: opnsense-pf-syslog
+    syslog:
+      listen_address: 0.0.0.0:514
+      labels:
+        app: pf
+        host: opnsense
+        env: home
+        facility: local0
+      idle_timeout: 60s
+      label_structured_data: true
+    relabel_configs:
+      - source_labels: ['__syslog_message_hostname']
+        target_label: host
+    pipeline_stages:
+      # Extract pf log fields with improved regex for IPv6 support
+      - regex:
+          expression: '.*(?:rule (?:\d+(?:/\d+)? )?\((?P<rule_label>[^\)]+)\) )?.* (?P<action>pass|block) (?P<direction>in|out) on (?P<iface>\w+): .* (?P<proto>\w+) (?P<src_ip>[0-9a-fA-F:\.]+)(?:\.(?P<src_port>\d+))? > (?P<dst_ip>[0-9a-fA-F:\.]+)(?:\.(?P<dst_port>\d+))?.*'
+      - labels:
+          rule_label:
+          action:
+          direction:
+          iface:
+          proto:
+          src_ip:
+          dst_ip:
+          src_port:
+          dst_port:
+      # GeoIP enrichment for source IPs
+      - geoip:
+          db: /etc/promtail/geoip/GeoLite2-City.mmdb
+          source: src_ip
+          db_type: city
+          labels:
+            country_iso: country.iso_code
+            country_name: country.names.en
+            city: city.names.en
+            latitude: location.latitude
+            longitude: location.longitude
+            continent: continent.code
+      # Drop internal traffic from GeoIP (optional)
+      - drop:
+          expression: '(src_ip =~ "192\\.168\\..*|10\\..*|172\\.(1[6-9]|2[0-9]|3[01])\\..*|127\\..*|::1|fc00::|fd00::|fe80::.*")'
+          older_than: 24h
+
+  # AdGuard Home query logs via syslog
+  - job_name: adguard-query-syslog
+    syslog:
+      listen_address: 0.0.0.0:515
+      labels:
+        app: adguard
+        host: opnsense
+        env: home
+        facility: local1
+      idle_timeout: 60s
+      label_structured_data: true
+    pipeline_stages:
+      # Parse AdGuard query log format
+      - regex:
+          expression: '.*client (?P<client_ip>[0-9a-fA-F:\.]+)(?:\s+\((?P<client_name>[^\)]+)\))? (?P<domain>\S+) (?P<type>\w+) (?P<status>\w+)(?:\s+(?P<elapsed_ms>\d+)ms)?(?:\s+upstream (?P<upstream>\S+))?(?:\s+rule "(?P<rule>[^"]*)")?.*'
+      - labels:
+          client_ip:
+          client_name:
+          domain:
+          type:
+          status:
+          elapsed_ms:
+          upstream:
+          rule:
+      # Convert elapsed time to proper format
+      - template:
+          source: elapsed_ms
+          template: '{{ if .elapsed_ms }}{{ .elapsed_ms }}{{ else }}0{{ end }}'
+      # Drop overly verbose or internal queries (optional)
+      - drop:
+          expression: '(domain =~ ".*\\.local|.*\\.lan|.*\\.home\\.arpa" or status = "cached")'
+          older_than: 1h
+
+  # Event Collector JSON logs from media services
+  - job_name: event-collector-jsonl
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: event-collector
+          host: dashboard
+          env: home
+          __path__: /var/log/event-collector/*.jsonl
+    pipeline_stages:
+      # Parse JSONL format
+      - json:
+          expressions:
+            timestamp: timestamp
+            service: service
+            instance: instance
+            action: action
+            title: title
+            quality: quality
+            size_bytes: size_bytes
+            details: details
+      # Extract nested details if needed
+      - json:
+          expressions:
+            indexer: details.indexer
+            torrent_hash: details.torrent_hash
+            path: details.path
+          source: details
+      - labels:
+          service:
+          instance:
+          action:
+          quality:
+          indexer:
+      # Convert timestamp format if needed
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      # Add size formatting for better readability
+      - template:
+          source: size_gb
+          template: '{{ if .size_bytes }}{{ div .size_bytes 1073741824 | printf "%.2f" }}{{ else }}0{{ end }}'
+
+  # System logs for monitoring stack health (optional)
+  - job_name: docker-logs
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: docker
+          host: dashboard
+          env: home
+          __path__: /var/lib/docker/containers/*/*-json.log
+    pipeline_stages:
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+            attrs: attrs
+      - json:
+          expressions:
+            container_name: "com.docker.compose.service"
+            project: "com.docker.compose.project"
+          source: attrs
+      - labels:
+          container_name:
+          project:
+          stream:
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      # Filter to monitoring stack only
+      - match:
+          selector: '{project="opnsense-stats-dashboard"}'
+          stages:
+            - output:
+                source: log

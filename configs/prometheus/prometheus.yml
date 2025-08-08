@@ -1,0 +1,129 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    monitor: 'opnsense-home'
+    location: 'australia'
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Core infrastructure - high frequency scraping
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'adguard'
+    scrape_interval: 15s
+    metrics_path: /control/metrics
+    static_configs:
+      - targets: ['192.168.10.1:3000']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'adguard-home'
+
+  - job_name: 'unbound_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['unbound_exporter:9167']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'unbound'
+
+  - job_name: 'snmp_opnsense'
+    scrape_interval: 15s
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    static_configs:
+      - targets: ['192.168.10.1']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp_exporter:9116
+      - target_label: device
+        replacement: 'opnsense'
+
+  # Media services - moderate frequency scraping
+  - job_name: 'qbittorrent_exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['qbittorrent_exporter:8000']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'qbittorrent'
+
+  - job_name: 'sonarr_exporter'
+    scrape_interval: 45s
+    static_configs:
+      - targets: ['sonarr_exporter_main:9707']
+        labels:
+          instance: 'sonarr-main'
+          library: 'main'
+      - targets: ['sonarr_exporter_cartoons:9708']
+        labels:
+          instance: 'sonarr-cartoons'
+          library: 'cartoons'
+      - targets: ['sonarr_exporter_anime:9709']
+        labels:
+          instance: 'sonarr-anime'
+          library: 'anime'
+
+  - job_name: 'radarr_exporter'
+    scrape_interval: 45s
+    static_configs:
+      - targets: ['radarr_exporter_main:9607']
+        labels:
+          instance: 'radarr-main'
+          library: 'main'
+      - targets: ['radarr_exporter_cartoons:9608']
+        labels:
+          instance: 'radarr-cartoons'
+          library: 'cartoons'
+      - targets: ['radarr_exporter_anime:9609']
+        labels:
+          instance: 'radarr-anime'
+          library: 'anime'
+
+  - job_name: 'prowlarr_exporter'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['prowlarr_exporter:9807']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'prowlarr'
+
+  # Optional services
+  - job_name: 'blackbox'
+    scrape_interval: 30s
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+        - 192.168.10.1    # OPNsense
+        - 192.168.10.11   # Nginx
+        - 8.8.8.8         # Google DNS
+        - 1.1.1.1         # Cloudflare DNS
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115
+
+  - job_name: 'speedtest'
+    scrape_interval: 3600s  # Every hour
+    scrape_timeout: 90s
+    static_configs:
+      - targets: ['speedtest_exporter:9798']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'wan-speedtest'

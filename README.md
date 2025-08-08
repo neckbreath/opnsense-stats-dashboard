@@ -29,6 +29,11 @@ Local-only observability stack for an OPNsense-centred home network. Visualise W
 - docs/media-stack-topology.md
 - docs/deployment-parameters.md
 
+## Manual Configuration Guide
+- docs/manual-configuration-steps.md
+- docs/deployment-checklist.md
+- docs/llm-helper-agent-prompt.md ⭐ **Copy-paste prompt for AI-guided setup**
+
 ## Config templates
 - configs/promtail/promtail-syslog-pipeline.example.yml
 - configs/prometheus/prometheus-scrape-config.example.yml

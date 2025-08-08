@@ -1,0 +1,298 @@
+version: '3.8'
+
+networks:
+  monitoring:
+    name: monitoring
+    driver: bridge
+
+volumes:
+  prometheus-data: {}
+  loki-data: {}
+  grafana-data: {}
+  promtail-positions: {}
+  promtail-maxmind: {}
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    container_name: prometheus
+    hostname: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=31d
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --web.console.templates=/etc/prometheus/consoles
+      - --web.enable-lifecycle
+      - --web.listen-address=0.0.0.0:9090
+    volumes:
+      - prometheus-data:/prometheus
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "192.168.10.10:9090:9090"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: loki
+    hostname: loki
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - loki-data:/loki
+      - ./configs/loki/loki.yml:/etc/loki/config.yml:ro
+    ports:
+      - "192.168.10.10:3100:3100"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+
+  promtail:
+    image: grafana/promtail:2.9.6
+    container_name: promtail
+    hostname: promtail
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - promtail-positions:/run/promtail
+      - ./configs/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - promtail-maxmind:/etc/promtail/geoip:ro
+      - /var/log/event-collector:/var/log/event-collector:ro
+    ports:
+      - "192.168.10.10:514:514/tcp"
+      - "192.168.10.10:515:515/tcp"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: grafana
+    hostname: grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SERVER_DOMAIN=192.168.10.10
+      - GF_SERVER_ROOT_URL=http://192.168.10.10:3000/
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_DEFAULT_THEME=light
+      - GF_DATE_FORMATS_DEFAULT_TIMEZONE=Australia/Sydney
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:3000:3000"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  snmp_exporter:
+    image: prom/snmp-exporter:v0.25.0
+    container_name: snmp_exporter
+    hostname: snmp_exporter
+    ports:
+      - "192.168.10.10:9116:9116"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+
+  unbound_exporter:
+    image: letsencrypt/unbound_exporter:v0.4.6
+    container_name: unbound_exporter
+    hostname: unbound_exporter
+    environment:
+      - UNBOUND_HOST=192.168.10.1
+      - UNBOUND_PORT=8953
+      - UNBOUND_CONTROL_KEY=/certs/unbound_control.key
+      - UNBOUND_CONTROL_CERT=/certs/unbound_control.pem
+      - UNBOUND_SERVER_KEY=/certs/unbound_server.key
+      - UNBOUND_SERVER_CERT=/certs/unbound_server.pem
+      - TZ=Australia/Sydney
+    volumes:
+      - ./unbound-certs:/certs:ro
+    ports:
+      - "192.168.10.10:9167:9167"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  qbittorrent_exporter:
+    image: esanchezm/prometheus-qbittorrent-exporter:v1.5.1
+    container_name: qbittorrent_exporter
+    hostname: qbittorrent_exporter
+    environment:
+      - QBITTORRENT_BASE_URL=http://192.168.10.10:8080
+      - QBITTORRENT_USERNAME=monitor
+      - QBITTORRENT_PASSWORD=${QBITTORRENT_MONITOR_PASSWORD}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9022:8000"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  sonarr_exporter_main:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: sonarr_exporter_main
+    hostname: sonarr_exporter_main
+    environment:
+      - PORT=9707
+      - URL=http://192.168.10.10:8989
+      - APIKEY=${SONARR_MAIN_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9707:9707"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  sonarr_exporter_cartoons:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: sonarr_exporter_cartoons
+    hostname: sonarr_exporter_cartoons
+    environment:
+      - PORT=9708
+      - URL=http://192.168.10.10:8990
+      - APIKEY=${SONARR_CARTOONS_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9708:9708"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  sonarr_exporter_anime:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: sonarr_exporter_anime
+    hostname: sonarr_exporter_anime
+    environment:
+      - PORT=9709
+      - URL=http://192.168.10.10:8991
+      - APIKEY=${SONARR_ANIME_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9709:9709"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  radarr_exporter_main:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: radarr_exporter_main
+    hostname: radarr_exporter_main
+    environment:
+      - PORT=9607
+      - URL=http://192.168.10.10:7878
+      - APIKEY=${RADARR_MAIN_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9607:9607"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  radarr_exporter_cartoons:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: radarr_exporter_cartoons
+    hostname: radarr_exporter_cartoons
+    environment:
+      - PORT=9608
+      - URL=http://192.168.10.10:7879
+      - APIKEY=${RADARR_CARTOONS_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9608:9608"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  radarr_exporter_anime:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: radarr_exporter_anime
+    hostname: radarr_exporter_anime
+    environment:
+      - PORT=9609
+      - URL=http://192.168.10.10:7880
+      - APIKEY=${RADARR_ANIME_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9609:9609"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  prowlarr_exporter:
+    image: onedr0p/exportarr:v2.0.1
+    container_name: prowlarr_exporter
+    hostname: prowlarr_exporter
+    environment:
+      - PORT=9807
+      - URL=http://192.168.10.10:9696
+      - APIKEY=${PROWLARR_API_KEY}
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9807:9807"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  event-collector:
+    build:
+      context: ./services/event-collector
+      dockerfile: Dockerfile
+    container_name: event-collector
+    hostname: event-collector
+    environment:
+      - EVENT_COLLECTOR_BIND=0.0.0.0:8088
+      - EVENT_COLLECTOR_TOKEN=${EVENT_COLLECTOR_TOKEN}
+      - EVENT_COLLECTOR_LOG_DIR=/var/log/event-collector
+      - TZ=Australia/Sydney
+    volumes:
+      - /var/log/event-collector:/var/log/event-collector
+    ports:
+      - "192.168.10.10:8088:8088"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Optional: Blackbox exporter for ICMP/TCP checks
+  blackbox_exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: blackbox_exporter
+    hostname: blackbox_exporter
+    volumes:
+      - ./configs/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    ports:
+      - "192.168.10.10:9115:9115"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+    profiles:
+      - optional
+
+  # Optional: Speedtest exporter for WAN monitoring
+  speedtest_exporter:
+    image: miguelndecarvalho/speedtest-exporter:v3.5.4
+    container_name: speedtest_exporter
+    hostname: speedtest_exporter
+    ports:
+      - "192.168.10.10:9798:9798"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney
+    profiles:
+      - optional
