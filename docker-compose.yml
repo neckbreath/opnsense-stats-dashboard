@@ -10,7 +10,6 @@ volumes:
   loki-data: {}
   grafana-data: {}
   promtail-positions: {}
-  promtail-maxmind: {}
 
 services:
   prometheus:
@@ -52,6 +51,20 @@ services:
     environment:
       - TZ=Australia/Sydney
 
+  rsyslog:
+    build:
+      context: .
+      dockerfile: Dockerfile.rsyslog
+    container_name: rsyslog
+    hostname: rsyslog
+    volumes:
+      - ./opnsense-logs:/var/log/opnsense
+    ports:
+      - "192.168.10.10:1514:1514/udp"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
   promtail:
     image: grafana/promtail:2.9.6
     container_name: promtail
@@ -60,11 +73,9 @@ services:
     volumes:
       - promtail-positions:/run/promtail
       - ./configs/promtail/promtail.yml:/etc/promtail/config.yml:ro
-      - promtail-maxmind:/etc/promtail/geoip:ro
+      - ./promtail-maxmind:/etc/promtail/geoip:ro
       - /var/log/event-collector:/var/log/event-collector:ro
-    ports:
-      - "192.168.10.10:514:514/tcp"
-      - "192.168.10.10:515:515/tcp"
+      - ./opnsense-logs:/var/log/opnsense:ro
     networks:
       - monitoring
     restart: unless-stopped
@@ -107,7 +118,7 @@ services:
       - TZ=Australia/Sydney
 
   unbound_exporter:
-    image: letsencrypt/unbound_exporter:v0.4.6
+    image: ghcr.io/letsencrypt/unbound-exporter:latest
     container_name: unbound_exporter
     hostname: unbound_exporter
     environment:
@@ -122,6 +133,21 @@ services:
       - ./unbound-certs:/certs:ro
     ports:
       - "192.168.10.10:9167:9167"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  adguard_exporter:
+    image: sfragata/adguardhome_exporter:latest
+    container_name: adguard_exporter
+    hostname: adguard_exporter
+    command:
+      - "--host=192.168.10.1"
+      - "--port=3000"
+    environment:
+      - TZ=Australia/Sydney
+    ports:
+      - "192.168.10.10:9617:9311"
     networks:
       - monitoring
     restart: unless-stopped
@@ -162,7 +188,7 @@ services:
     hostname: sonarr_exporter_cartoons
     environment:
       - PORT=9708
-      - URL=http://192.168.10.10:8990
+      - URL=http://192.168.10.10:8991
       - APIKEY=${SONARR_CARTOONS_API_KEY}
       - TZ=Australia/Sydney
     ports:
@@ -177,7 +203,7 @@ services:
     hostname: sonarr_exporter_anime
     environment:
       - PORT=9709
-      - URL=http://192.168.10.10:8991
+      - URL=http://192.168.10.10:8990
       - APIKEY=${SONARR_ANIME_API_KEY}
       - TZ=Australia/Sydney
     ports:
@@ -296,3 +322,28 @@ services:
       - TZ=Australia/Sydney
     profiles:
       - optional
+
+  # AdGuard Home API Collector - fetches query logs and forwards to syslog
+  adguard_collector:
+    build:
+      context: ./adguard-collector
+      dockerfile: Dockerfile
+    container_name: adguard_collector
+    hostname: adguard_collector
+    volumes:
+      - ./adguard-collector-data:/data
+    environment:
+      - ADGUARD_HOST=192.168.10.1
+      - ADGUARD_PORT=3000
+      - ADGUARD_USERNAME=admin
+      - ADGUARD_PASSWORD=${ADGUARD_PASSWORD}
+      - SYSLOG_HOST=rsyslog
+      - SYSLOG_PORT=1514
+      - POLL_INTERVAL=30
+      - BATCH_SIZE=50
+      - TZ=Australia/Sydney
+    networks:
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - rsyslog

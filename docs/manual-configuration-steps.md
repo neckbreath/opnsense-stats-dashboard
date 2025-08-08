@@ -81,8 +81,8 @@ These steps must be completed on-site to fully activate the monitoring stack.
    
    **Sonarr Instances:**
    - Main (8989): Settings → General → Security → API Key
-   - Cartoons (8990): Settings → General → Security → API Key  
-   - Anime (8991): Settings → General → Security → API Key
+   - Cartoons (8991): Settings → General → Security → API Key  
+   - Anime (8990): Settings → General → Security → API Key
    - Copy each to respective `SONARR_*_API_KEY` variables in .env
    
    **Radarr Instances:**
@@ -127,14 +127,13 @@ These steps must be completed on-site to fully activate the monitoring stack.
    - Click "Add" to create new log target
    - **Configuration:**
      - Enabled: ✓ Checked
-     - Transport: TCP
+     - Transport: UDP
      - Applications: Firewall, System, Unbound (select all relevant)
      - Levels: Info, Notice, Warning, Error, Critical, Alert, Emergency
      - Facilities: All facilities
      - Hostname: 192.168.10.10
-     - Port: 514
-     - Certificate: (leave empty for TCP)
-     - Format: RFC5424
+     - Port: 1514
+     - Format: BSD (RFC3164)
    - Click "Save" and "Apply changes"
    
    **Verification:**
@@ -142,8 +141,8 @@ These steps must be completed on-site to fully activate the monitoring stack.
    # Generate test log entry from OPNsense
    logger "Test syslog message from OPNsense"
    
-   # Check if logs reach Promtail (after deployment)
-   docker-compose logs promtail | grep "Test syslog"
+   # Check if file contains the log (rsyslog writes to file)
+   sudo tail -n 100 /path/to/project/opnsense-logs/firewall.log | grep "Test syslog"
    ```
 
 2. **Configure Firewall Rule Logging**
@@ -208,7 +207,7 @@ These steps must be completed on-site to fully activate the monitoring stack.
    unbound-control -c ./unbound-certs/unbound_control.pem stats
    ```
 
-#### Phase 3: AdGuard Home Integration
+#### Phase 3: AdGuard Home Integration (via API Collector)
 
 1. **Enable Prometheus Metrics**
    - Access AdGuard WebUI: http://192.168.10.1:3000 (confirm port)
@@ -248,44 +247,18 @@ These steps must be completed on-site to fully activate the monitoring stack.
    # Should return Prometheus formatted metrics
    ```
 
-2. **Configure Query Log Syslog Output**
-   
-   **Method 1: AdGuard WebUI (if available)**
-   - Settings → Logging → Syslog
-   - Server: 192.168.10.10
-   - Port: 515
-   - Protocol: TCP
-   
-   **Method 2: Manual Configuration**
-   ```bash
-   # Edit AdGuard config
-   nano /var/db/adguardhome/AdGuardHome.yaml
-   
-   # Add syslog configuration:
-   log:
-     file: ""
-     max_backups: 0
-     max_size: 100
-     max_age: 3
-     compress: false
-     local_time: false
-     verbose: false
-     syslog:
-       enabled: true
-       facility: "LOG_LOCAL0"
-       server_addr: "192.168.10.10:515"
-   
-   # Restart AdGuard
-   service adguardhome restart
-   ```
+2. **Configure API Access for Query Logs**
+   - Ensure AdGuard admin username/password
+   - Set `ADGUARD_USERNAME` and `ADGUARD_PASSWORD` in `.env`
+   - The `adguard_collector` service will poll `/control/querylog` and forward to rsyslog:1514
    
    **Verification:**
    ```bash
    # Generate test DNS query
    nslookup test.example.com 192.168.10.1
    
-   # Check if query appears in Promtail logs (after deployment)
-   docker-compose logs promtail | grep "test.example.com"
+   # Check that rsyslog file receives formatted AdGuard query entries
+   sudo tail -n 100 /path/to/project/opnsense-logs/firewall.log | grep "AdGuardHome"
    ```
 
 3. **Confirm AdGuard Admin Interface Port**
@@ -336,11 +309,11 @@ These steps must be completed on-site to fully activate the monitoring stack.
        - Key: `X-Auth-Token`
        - Value: `[EVENT_COLLECTOR_TOKEN from .env]`
    
-   **Sonarr Cartoons (8990):**
+   **Sonarr Cartoons (8991):**
    - Repeat above steps with URL: `http://192.168.10.10:8088/webhook/sonarr/cartoons`
    - API Key to: `SONARR_CARTOONS_API_KEY`
    
-   **Sonarr Anime (8991):**
+   **Sonarr Anime (8990):**
    - Repeat above steps with URL: `http://192.168.10.10:8088/webhook/sonarr/anime`
    - API Key to: `SONARR_ANIME_API_KEY`
 

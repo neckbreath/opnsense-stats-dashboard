@@ -32,7 +32,7 @@
 - **OPNsense Gateway:** 192.168.10.1 (SNMP, syslog, Unbound remote-control)
 - **Dashboard Host:** 192.168.10.10 (all monitoring services)
 - **Media Stack:** All instances mapped with correct ports
-  - Sonarr: 8989 (main), 8990 (cartoons), 8991 (anime)
+  - Sonarr: 8989 (main), 8991 (cartoons), 8990 (anime)
   - Radarr: 7878 (main), 7879 (cartoons), 7880 (anime)
   - qBittorrent: 8080, Prowlarr: 9696, Jellyseer: 5055, Jellyfin: 8096
 - **WireGuard Interface:** wg1 monitoring configured
@@ -115,9 +115,9 @@
    - Validate data flow using testing procedures
 
 3. **Integration Points**
-   - OPNsense syslog → 192.168.10.10:514
-   - AdGuard syslog → 192.168.10.10:515
-   - Media webhooks → 192.168.10.10:8088
+   - OPNsense syslog → 192.168.10.10:1514/udp (rsyslog receives and writes to file for Promtail)
+   - AdGuard query logs → via API collector → rsyslog (no direct syslog)
+   - Media webhooks → 192.168.10.10:8088 (X-Auth-Token)
    - SNMP polling ← 192.168.10.1:161
 
 ### Service Access URLs (Post-Deployment)

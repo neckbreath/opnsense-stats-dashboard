@@ -13,8 +13,8 @@ All services run on **192.168.10.10** unless specified otherwise.
 
 **Sonarr Instances (incremental ports):**
 - **Main Library:** :8989 (default port, largest library, highest activity)
-- **Cartoons:** :8990 (smaller library, lower activity)
-- **Anime:** :8991 (smaller library, lower activity)
+- **Cartoons:** :8991 (smaller library, lower activity)
+- **Anime:** :8990 (smaller library, lower activity)
 
 **Radarr Instances (incremental ports):**
 - **Main Library:** :7878 (default port, largest library, highest activity)

@@ -9,83 +9,74 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # OPNsense pf firewall logs via syslog
-  - job_name: opnsense-pf-syslog
-    syslog:
-      listen_address: 0.0.0.0:514
+  # Mixed OPNsense and AdGuard logs from single file
+  - job_name: opnsense-mixed-logs
+    static_configs:
+    - targets:
+        - localhost
       labels:
-        app: pf
-        host: opnsense
+        job: opnsense-mixed
+        host: opnsense  
         env: home
-        facility: local0
-      idle_timeout: 60s
-      label_structured_data: true
-    relabel_configs:
-      - source_labels: ['__syslog_message_hostname']
-        target_label: host
+        __path__: /var/log/opnsense/firewall.log
     pipeline_stages:
-      # Extract pf log fields with improved regex for IPv6 support
+      # First, parse the syslog format to extract components
       - regex:
-          expression: '.*(?:rule (?:\d+(?:/\d+)? )?\((?P<rule_label>[^\)]+)\) )?.* (?P<action>pass|block) (?P<direction>in|out) on (?P<iface>\w+): .* (?P<proto>\w+) (?P<src_ip>[0-9a-fA-F:\.]+)(?:\.(?P<src_port>\d+))? > (?P<dst_ip>[0-9a-fA-F:\.]+)(?:\.(?P<dst_port>\d+))?.*'
-      - labels:
-          rule_label:
-          action:
-          direction:
-          iface:
-          proto:
-          src_ip:
-          dst_ip:
-          src_port:
-          dst_port:
-      # GeoIP enrichment for source IPs
-      - geoip:
-          db: /etc/promtail/geoip/GeoLite2-City.mmdb
-          source: src_ip
-          db_type: city
-          labels:
-            country_iso: country.iso_code
-            country_name: country.names.en
-            city: city.names.en
-            latitude: location.latitude
-            longitude: location.longitude
-            continent: continent.code
-      # Drop internal traffic from GeoIP (optional)
-      - drop:
-          expression: '(src_ip =~ "192\\.168\\..*|10\\..*|172\\.(1[6-9]|2[0-9]|3[01])\\..*|127\\..*|::1|fc00::|fd00::|fe80::.*")'
-          older_than: 24h
-
-  # AdGuard Home query logs via syslog
-  - job_name: adguard-query-syslog
-    syslog:
-      listen_address: 0.0.0.0:515
-      labels:
-        app: adguard
-        host: opnsense
-        env: home
-        facility: local1
-      idle_timeout: 60s
-      label_structured_data: true
-    pipeline_stages:
-      # Parse AdGuard query log format
-      - regex:
-          expression: '.*client (?P<client_ip>[0-9a-fA-F:\.]+)(?:\s+\((?P<client_name>[^\)]+)\))? (?P<domain>\S+) (?P<type>\w+) (?P<status>\w+)(?:\s+(?P<elapsed_ms>\d+)ms)?(?:\s+upstream (?P<upstream>\S+))?(?:\s+rule "(?P<rule>[^"]*)")?.*'
-      - labels:
-          client_ip:
-          client_name:
-          domain:
-          type:
-          status:
-          elapsed_ms:
-          upstream:
-          rule:
-      # Convert elapsed time to proper format
-      - template:
-          source: elapsed_ms
-          template: '{{ if .elapsed_ms }}{{ .elapsed_ms }}{{ else }}0{{ end }}'
-      # Drop overly verbose or internal queries (optional)
-      - drop:
-          expression: '(domain =~ ".*\\.local|.*\\.lan|.*\\.home\\.arpa" or status = "cached")'
-          older_than: 1h
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<program>\S+)(?:\[(?P<pid>\d+)\])?:?\s*(?P<message>.*)'
+      
+      # Branch processing based on program/content type
+      - match:
+          selector: '{job="opnsense-mixed"} |~ "AdGuardHome.*query"'
+          stages:
+            # This is an AdGuard query log
+            - labels:
+                log_type: "adguard"
+            # Parse AdGuard query format
+            - regex:
+                expression: 'query\s+(?P<domain>\S+)\s+(?P<query_type>\w+)\s+from client\s+(?P<client_ip>[0-9a-fA-F:\.]+)(?:\s+\((?P<client_name>[^\)]+)\))?\s+(?P<status>allowed|blocked|cached)\s+(?P<elapsed_ms>\d+)ms(?:\s+upstream\s+(?P<upstream>\S+))?(?:\s+rule\s+(?P<rule>\S+))?'
+                source: message
+            - labels:
+                domain:
+                query_type:
+                client_ip:
+                client_name:
+                status:
+                elapsed_ms:
+                upstream:
+                rule:
+      
+      - match:
+          selector: '{job="opnsense-mixed"} |~ "filterlog"'
+          stages:
+            # This is a firewall log
+            - labels:
+                log_type: "firewall"
+            # Parse firewall log format
+            - regex:
+                expression: '.*(?:rule (?:\d+(?:/\d+)? )?\((?P<rule_label>[^\)]+)\) )?.* (?P<action>pass|block) (?P<direction>in|out) on (?P<iface>\w+): .* (?P<proto>\w+) (?P<src_ip>[0-9a-fA-F:\.]+)(?:\.(?P<src_port>\d+))? > (?P<dst_ip>[0-9a-fA-F:\.]+)(?:\.(?P<dst_port>\d+))?.*'
+                source: message
+            - labels:
+                rule_label:
+                action:
+                direction:
+                iface:
+                proto:
+                src_ip:
+                dst_ip:
+                src_port:
+                dst_port:
+            # GeoIP enrichment for firewall logs only
+            - geoip:
+                db: /etc/promtail/geoip/GeoLite2-City.mmdb
+                source: src_ip
+                db_type: city
+                labels:
+                  country_iso: country.iso_code
+                  country_name: country.names.en
+                  city: city.names.en
+                  latitude: location.latitude
+                  longitude: location.longitude
+                  continent: continent.code
 
   # Event Collector JSON logs from media services
   - job_name: event-collector-jsonl

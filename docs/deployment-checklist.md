@@ -58,7 +58,8 @@
 
 - [ ] **Syslog Configuration**
   - [ ] Remote logging enabled
-  - [ ] Target: 192.168.10.10:514
+  - [ ] Target: 192.168.10.10:1514/udp (rsyslog)
+  - [ ] Format: BSD (RFC3164)
   - [ ] All facility levels selected
   - [ ] Test log entries sent successfully
 
@@ -86,7 +87,8 @@
 
 - [ ] **Query Logging**
   - [ ] Query log enabled
-  - [ ] Syslog output configured to 192.168.10.10:515
+  - [ ] API collector configured (no direct syslog)
+  - [ ] `ADGUARD_USERNAME`/`ADGUARD_PASSWORD` set in .env
   - [ ] Test queries appear in logs
 
 #### Media Services Integration ✓
@@ -103,12 +105,12 @@
   - [ ] Test webhook fires successfully
   - [ ] Events appear in Event Collector logs
 
-- [ ] **Sonarr Cartoons (8990)**
+- [ ] **Sonarr Cartoons (8991)**
   - [ ] API key added to .env  
   - [ ] Webhook configured: http://192.168.10.10:8088/webhook/sonarr/cartoons
   - [ ] Test webhook fires successfully
 
-- [ ] **Sonarr Anime (8991)**
+- [ ] **Sonarr Anime (8990)**
   - [ ] API key added to .env
   - [ ] Webhook configured: http://192.168.10.10:8088/webhook/sonarr/anime
   - [ ] Test webhook fires successfully

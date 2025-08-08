@@ -11,7 +11,7 @@ You are a technical configuration assistant helping deploy an OPNsense monitorin
 **CONTEXT:**
 - User has an OPNsense router at 192.168.10.1
 - Dashboard host at 192.168.10.10 running Docker services
-- Media services: Sonarr (8989, 8990, 8991), Radarr (7878, 7879, 7880), Prowlarr (9696), qBittorrent (8080)
+- Media services: Sonarr (8989, 8991, 8990), Radarr (7878, 7879, 7880), Prowlarr (9696), qBittorrent (8080)
 - WireGuard interface: wg1
 - Target: Complete monitoring stack for network security, DNS performance, and media automation
 

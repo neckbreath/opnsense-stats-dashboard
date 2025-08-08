@@ -1,0 +1,12 @@
+FROM alpine:3.18
+
+RUN apk add --no-cache rsyslog
+
+COPY rsyslog.conf /etc/rsyslog.conf
+
+# Create log directory
+RUN mkdir -p /var/log/opnsense
+
+EXPOSE 1514/udp
+
+CMD ["rsyslogd", "-n", "-f", "/etc/rsyslog.conf"]

@@ -264,9 +264,9 @@ show_access_info() {
     echo "  Loki:       http://$DASHBOARD_HOST:3100"
     echo
     echo "Next Steps:"
-    echo "  1. Configure OPNsense syslog to send to $DASHBOARD_HOST:514"
-    echo "  2. Configure AdGuard syslog to send to $DASHBOARD_HOST:515"
-    echo "  3. Set up webhooks in media services to $DASHBOARD_HOST:8088"
+    echo "  1. Configure OPNsense syslog to send to $DASHBOARD_HOST:1514/udp (rsyslog)"
+    echo "  2. Configure AdGuard API credentials for the adguard_collector (no direct syslog)"
+    echo "  3. Set up webhooks in media services to $DASHBOARD_HOST:8088 (header X-Auth-Token)"
     echo "  4. Check Grafana dashboards for data flow"
     echo
     echo "Log locations:"

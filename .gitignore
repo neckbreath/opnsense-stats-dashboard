@@ -1,0 +1,98 @@
+# ---- OS / Editor cruft ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+*.old
+*.orig
+
+# Editors/IDEs
+.vscode/
+.idea/
+*.code-workspace
+
+# ---- Environment files ----
+.env
+.env.*
+!*.example
+
+# ---- Logs ----
+*.log
+logs/
+opnsense-logs/
+
+# ---- Certificates / Keys / Sensitive material ----
+*.pem
+*.key
+*.crt
+*.csr
+*.der
+*.p12
+*.pfx
+*.jks
+unbound-certs/
+
+# Generic secret-y filenames
+*secret*
+*password*
+*token*
+
+# ---- GeoIP / Databases ----
+*.mmdb
+promtail-maxmind/
+*.sqlite
+*.db
+
+# ---- App-specific local data ----
+adguard-collector-data/
+
+# ---- Docker / Compose local overrides ----
+docker-compose.override.yml
+*.override.yml
+*.local.yml
+.envrc
+
+# ---- Dependencies / builds / caches ----
+node_modules/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+
+# Generic build artifacts
+build/
+dist/
+out/
+tmp/
+.cache/
+coverage/
+*.coverage
+*.cov
+*.coverprofile
+
+# ---- Local data volumes for services ----
+# Keep tracked config under `configs/`, but ignore runtime data dirs
+prometheus/data/
+grafana/data/
+loki/data/
+tempo/data/
+mimir/data/
+promtail/data/
+volumes/
+data/
